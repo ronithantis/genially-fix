@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>בוחן עצמאות</title>
+<style>
+:root {
+  --text: #1f1f1f;
+  --text-2: #444746;
+  --text-faded: #80868b;
+  --option-bg: #f8f9fa;
+  --option-hover: #f1f3f4;
+  --green-bg: #e3f1e6;
+  --green-text: #146c2e;
+  --red-bg: #fdf2f2;
+  --red-text: #b3261e;
+  --blue: #3c5bf5;
+  --blue-hover: #2f4ae0;
+  --border: #dadce0;
+  --font: 'Google Sans', 'Google Sans Text', 'Segoe UI', Roboto, 'Arial Hebrew', Arial, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { background: #fff; }
+body {
+  font-family: var(--font);
+  color: var(--text);
+  direction: rtl;
+  -webkit-font-smoothing: antialiased;
+}
+.quiz { max-width: 760px; margin: 0 auto; padding: 22px 24px 24px; }
+
+.top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+.counter { font-size: 14px; color: var(--text-faded); direction: ltr; }
+
+.question { font-size: 17px; font-weight: 500; line-height: 1.75; margin-bottom: 26px; }
+
+.options { display: flex; flex-direction: column; gap: 8px; margin-bottom: 22px; }
+.option {
+  width: 100%;
+  text-align: right;
+  background: var(--option-bg);
+  border: none;
+  border-radius: 12px;
+  padding: 16px 20px;
+  font-family: inherit;
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.option:hover:not(.locked) { background: var(--option-hover); }
+.option.locked { cursor: default; }
+.opt-main { display: flex; gap: 8px; font-size: 16px; line-height: 1.5; }
+.opt-letter { flex-shrink: 0; }
+.opt-feedback { display: none; margin-top: 8px; }
+.option.locked .opt-feedback { display: block; }
+.verdict { display: none; align-items: center; gap: 6px; font-size: 14px; font-weight: 700; margin-bottom: 6px; }
+.verdict svg { width: 16px; height: 16px; flex-shrink: 0; }
+.explanation { font-size: 14px; line-height: 1.75; color: var(--text-2); }
+
+.option.locked.other .opt-main { color: var(--text-faded); }
+.option.locked.other .explanation { color: var(--text-faded); }
+.option.correct { background: var(--green-bg); }
+.option.correct .verdict { display: flex; color: var(--green-text); }
+.option.wrong { background: var(--red-bg); }
+.option.wrong .verdict { display: flex; color: var(--red-text); }
+
+.bottom { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.hint-wrap { flex: 1; min-width: 0; }
+.hint-toggle {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: none; border: none; font-family: inherit;
+  font-size: 14px; color: var(--text); cursor: pointer; padding: 8px 4px;
+}
+.hint-toggle svg { width: 18px; height: 18px; transition: transform 0.2s; }
+.hint-toggle.open svg { transform: rotate(180deg); }
+.hint-text { display: none; font-size: 14px; line-height: 1.7; color: var(--text-2); padding: 2px 4px 0; max-width: 520px; }
+.hint-text.open { display: block; }
+
+.nav { display: flex; gap: 8px; flex-shrink: 0; }
+.btn {
+  font-family: inherit; font-size: 14px; font-weight: 500;
+  border-radius: 999px; padding: 9px 20px; cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.btn-primary { background: var(--blue); color: #fff; border: 1px solid var(--blue); }
+.btn-primary:hover { background: var(--blue-hover); }
+.btn-secondary { background: #fff; color: var(--text); border: 1px solid var(--border); }
+.btn-secondary:hover { background: var(--option-hover); }
+.btn[hidden] { display: none; }
+
+/* מסך סיום */
+.summary { text-align: center; padding: 30px 10px 10px; }
+.summary[hidden], .quiz-body[hidden] { display: none; }
+.summary h2 { font-size: 22px; font-weight: 500; margin-bottom: 10px; }
+.score { font-size: 44px; font-weight: 700; color: var(--blue); margin: 14px 0 6px; direction: ltr; }
+.summary p { color: var(--text-2); font-size: 15px; margin-bottom: 24px; }
+.summary-list { text-align: right; max-width: 520px; margin: 0 auto 24px; display: flex; flex-direction: column; gap: 6px; }
+.summary-item { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; line-height: 1.6; background: var(--option-bg); border-radius: 10px; padding: 10px 14px; }
+.summary-item .mark { font-weight: 700; flex-shrink: 0; }
+.summary-item.ok .mark { color: var(--green-text); }
+.summary-item.no .mark { color: var(--red-text); }
+
+@media (max-width: 480px) {
+  .quiz { padding: 16px 14px; }
+  .question { font-size: 16px; }
+  .option { padding: 14px 16px; }
+}
+</style>
+</head>
+<body>
+<div class="quiz">
+  <div class="quiz-body" id="quizBody">
+    <div class="top">
+      <span class="counter" id="counter"></span>
+    </div>
+    <div class="question" id="question"></div>
+    <div class="options" id="options"></div>
+    <div class="bottom">
+      <div class="hint-wrap" id="hintWrap">
+        <button class="hint-toggle" id="hintToggle">
+          רמז
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div class="hint-text" id="hintText"></div>
+      </div>
+      <div class="nav">
+        <button class="btn btn-secondary" id="prevBtn">הקודם</button>
+        <button class="btn btn-primary" id="nextBtn">הבא</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="summary" id="summary" hidden>
+    <h2>סיימת את הבוחן!</h2>
+    <div class="score" id="score"></div>
+    <p id="scoreText"></p>
+    <div class="summary-list" id="summaryList"></div>
+    <button class="btn btn-primary" id="restartBtn">נסו שוב</button>
+  </div>
+</div>
+
+<script>
+(function () {
+  // ===== שאלות הבוחן – כאן עורכים תוכן =====
+  // correct = מספר התשובה הנכונה (0 = A, 1 = B, 2 = C, 3 = D)
+  const QUESTIONS = [
+    {
+      q: "באיזו עיר הוכרזה הקמתה של מדינת ישראל ביום ה' באייר תש\"ח (14 במאי 1948)?",
+      hint: "חשבו על העיר העברית הראשונה, שהייתה בלב היישוב היהודי ורחוקה יחסית מקווי הלחימה.",
+      correct: 3,
+      options: [
+        { t: "ירושלים", e: "למרות חשיבותה, ירושלים הייתה במרכז הלחימה באותה תקופה והגישה אליה הייתה מנותקת, ולכן הטקס לא נערך בה." },
+        { t: "צפת", e: "צפת היא עיר היסטורית חשובה, אך לא הייתה המרכז הפוליטי של היישוב היהודי בעת הקמת המדינה." },
+        { t: "חיפה", e: "חיפה היא עיר מרכזית וחשובה, אך טקס הכרזת העצמאות ההיסטורי לא התקיים בה." },
+        { t: "תל אביב", e: "ההכרזה התקיימה במוזיאון תל אביב, שהיה מקום מרכזי ובטוח יחסית בלב היישוב היהודי באותה עת." }
+      ]
+    },
+    {
+      q: "מהו השם שניתן להחלטת האו\"ם מ-29 בנובמבר 1947, שהציעה לחלק את ארץ ישראל לשתי מדינות - יהודית וערבית?",
+      hint: "השם מתאר בדיוק את מה שההחלטה הציעה לעשות לשטח הארץ.",
+      correct: 1,
+      options: [
+        { t: "הצהרת בלפור", e: "הצהרת בלפור הייתה הצהרה בריטית מ-1917 שתמכה בהקמת בית לאומי לעם היהודי, ולא החלטה של האו\"ם לחלוקת הארץ." },
+        { t: "תוכנית החלוקה", e: "שם זה מתאר במדויק את הצעת האו\"ם לחלק את שטח המנדט לשתי מדינות נפרדות, יהודית וערבית." },
+        { t: "מגילת העצמאות", e: "מגילת העצמאות היא המסמך שהכריז על הקמת מדינת ישראל ב-1948, בעקבות קבלת תוכנית החלוקה." },
+        { t: "ועידת סן רמו", e: "ועידת סן רמו התקיימה ב-1920 ואישרה את המנדט הבריטי על ארץ ישראל, היא קדמה להחלטת האו\"ם." }
+      ]
+    },
+    {
+      q: "על פי מגילת העצמאות, מהו הבסיס ההיסטורי לקשר של העם היהודי לארץ ישראל?",
+      hint: "המגילה פותחת אלפי שנים לפני העת החדשה - בתקופת התנ\"ך.",
+      correct: 2,
+      options: [
+        { t: "הצהרת בלפור שנתנה בריטניה", e: "הצהרת בלפור היא הצדקה בינלאומית מודרנית, אך המגילה מדגישה את השורשים ההיסטוריים העתיקים כבסיס ראשוני." },
+        { t: "התנועה הציונית שהקים הרצל", e: "התנועה הציונית היא גורם חשוב ומוזכר, אך המגילה מצביעה על קשר עתיק הרבה יותר." },
+        { t: "הקמת העם היהודי וקיום ממלכות ישראל הקדומות בארץ", e: "המגילה פותחת בתיאור ההיסטוריה העתיקה, שבה קם העם היהודי בארץ ישראל, חי בה חיי עצמאות ויצר את התנ\"ך." },
+        { t: "העלייה לארץ של החלוצים במאה ה-19", e: "העלייה וההתיישבות בדורות האחרונים הן שלב חשוב בשיבת ציון, אך הקשר ההיסטורי החל אלפי שנים קודם לכן." }
+      ]
+    },
+    {
+      q: "מי עמד בראש התנועה הציונית המדינית ופעל כדי לקבל הכרה בינלאומית להקמת מדינה יהודית?",
+      hint: "הוא כתב את הספר \"מדינת היהודים\" וכינס את הקונגרס הציוני הראשון בבזל.",
+      correct: 3,
+      options: [
+        { t: "דוד בן גוריון", e: "דוד בן גוריון היה מנהיג היישוב והכריז על הקמת המדינה, אך מי שייסד את התנועה הציונית המדינית פעל לפניו." },
+        { t: "ארתור בלפור", e: "ארתור בלפור היה שר החוץ הבריטי שתמך ברעיון, אך הוא לא היה יהודי ולא עמד בראש התנועה הציונית." },
+        { t: "חאג' אמין אל-חוסייני", e: "חאג' אמין אל-חוסייני היה המנהיג של התנועה הלאומית הערבית-פלסטינית והתנגד להקמת מדינה יהודית." },
+        { t: "בנימין זאב הרצל", e: "הרצל נחשב ל\"חוזה המדינה\" והוא זה שהוביל את הציונות המדינית ופעל בקרב מנהיגי העולם למען הקמת מדינה." }
+      ]
+    },
+    {
+      q: "כיצד הגיבו מדינות ערב להכרזת העצמאות של מדינת ישראל?",
+      hint: "התגובה שלהן סימנה את תחילתו של שלב חדש וקשה במלחמת העצמאות.",
+      correct: 0,
+      options: [
+        { t: "הן פלשו לשטח מדינת ישראל למחרת ההכרזה", e: "מיד לאחר ההכרזה, צבאות של מספר מדינות ערב פלשו לישראל, והתחיל השלב השני והקשה של מלחמת העצמאות." },
+        { t: "הן נשארו ניטרליות ולא התערבו", e: "מדינות ערב השכנות היו מעורבות מאוד בסכסוך ולא נשארו בצד." },
+        { t: "הן פנו לאו\"ם בבקשה לתווך בין הצדדים", e: "אף על פי שהיו מעורבויות של האו\"ם, התגובה המיידית של מדינות ערב הייתה צבאית." },
+        { t: "הן קיבלו את ההכרזה והציעו הסכם שלום", e: "מצב זה לא התרחש; התגובה הייתה הפוכה לחלוטין." }
+      ]
+    },
+    {
+      q: "איזו פשרה מפורסמת נעשתה בניסוח מגילת העצמאות כדי לגשר בין דתיים לחילונים?",
+      hint: "הפשרה נוגעת לביטוי אחד שמופיע לקראת סוף המגילה, ושכל צד יכול לפרש בדרכו.",
+      correct: 1,
+      options: [
+        { t: "הוחלט שהמדינה תהיה גם \"יהודית\" וגם \"דמוקרטית\"", e: "השילוב בין יהודית לדמוקרטית הוא עיקרון יסוד, אך הפשרה המפורסמת ביותר נוגעת לביטוי ספציפי אחר." },
+        { t: "השימוש בביטוי \"צור ישראל\" במקום שם אלוהים המפורש", e: "ביטוי זה אפשר לדתיים לראות בו את אלוהים ולחילונים לפרש אותו ככוחו של עם ישראל, וכך כולם הסכימו לחתום." },
+        { t: "הובטח שתחוקק חוקה בתוך מספר חודשים", e: "ההבטחה לחוקה אכן מופיעה במגילה, אך היא נובעת מדרישת האו\"ם ואינה הפשרה המרכזית בין דתיים לחילונים בנוסח עצמו." },
+        { t: "הוחלט שהדגל יכלול מגן דוד", e: "הבחירה במגן דוד כסמל הייתה מקובלת יחסית ולא היוותה את נקודת המחלוקת המרכזית בין הקבוצות." }
+      ]
+    },
+    {
+      q: "מה היה ההבדל העיקרי בין שני השלבים של מלחמת העצמאות?",
+      hint: "חשבו מי נלחם נגד היישוב היהודי לפני ההכרזה, ומי הצטרף מיד אחריה.",
+      correct: 3,
+      options: [
+        { t: "בשלב הראשון ליהודים היה יתרון, ובשלב השני לערבים היה יתרון", e: "יחסי הכוחות השתנו במהלך המלחמה, אך ההבדל המהותי היה בזהות הכוחות הלוחמים." },
+        { t: "בשלב הראשון לבריטים הייתה שליטה, ובשלב השני לאו\"ם הייתה שליטה", e: "הבריטים עזבו בסוף השלב הראשון, אך האו\"ם לא שלט צבאית בשטח בשלב השני." },
+        { t: "בשלב הראשון נלחמו רק ביום, ובשלב השני נלחמו גם בלילה", e: "הלחימה התנהלה בכל שעות היממה בשני השלבים, זה לא היה קו ההבחנה המרכזי." },
+        { t: "בשלב הראשון נלחמו נגד ערביי ארץ ישראל, ובשלב השני נגד צבאות של מדינות ערב", e: "זוהי ההבחנה המדויקת: עד הכרזת המדינה הלחימה הייתה פנימית, ולאחריה הפכה למלחמה בין מדינות." }
+      ]
+    },
+    {
+      q: "מהי \"הצהרת בלפור\" שניתנה בשנת 1917?",
+      hint: "ההצהרה ניתנה על ידי מעצמה אירופית גדולה, הרבה לפני שהאו\"ם הוקם.",
+      correct: 2,
+      options: [
+        { t: "החלטה של האו\"ם להקים את מדינת ישראל.", e: "החלטת האו\"ם התקבלה ב-1947, והאו\"ם כלל לא היה קיים ב-1917, אז פעל \"חבר הלאומים\"." },
+        { t: "הסכם שלום בין יהודים וערבים בארץ ישראל.", e: "הצהרת בלפור לא הייתה הסכם בין יהודים לערבים, אלא הצהרה של מעצמה זרה." },
+        { t: "מסמך בריטי שהביע תמיכה בהקמת \"בית לאומי\" לעם היהודי בארץ ישראל.", e: "זוהי מהות ההצהרה, שבה ממשלת בריטניה הכירה בקשר של העם היהודי לארץ והבטיחה לסייע בהקמת בית לאומי." },
+        { t: "הכרזה על סיום המנדט הבריטי בארץ ישראל.", e: "סיום המנדט התרחש עשרות שנים לאחר הצהרת בלפור, בשנת 1948." }
+      ]
+    }
+  ];
+  const LETTERS = ["A", "B", "C", "D", "E", "F"];
+  const CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+  const CROSS = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+
+  const $ = (id) => document.getElementById(id);
+  let current = 0;
+  let answers = new Array(QUESTIONS.length).fill(null);
+
+  function render() {
+    const item = QUESTIONS[current];
+    const chosen = answers[current];
+    const answered = chosen !== null;
+
+    $("counter").textContent = (current + 1) + " / " + QUESTIONS.length;
+    $("question").textContent = item.q;
+
+    const box = $("options");
+    box.innerHTML = "";
+    item.options.forEach((opt, i) => {
+      const btn = document.createElement("button");
+      btn.className = "option";
+      let verdictHTML = "";
+      if (answered) {
+        btn.classList.add("locked");
+        if (i === item.correct) {
+          btn.classList.add("correct");
+          verdictHTML = CHECK + (chosen === item.correct ? "נכון מאוד" : "התשובה הנכונה");
+        } else if (i === chosen) {
+          btn.classList.add("wrong");
+          verdictHTML = CROSS + "לא בדיוק";
+        } else {
+          btn.classList.add("other");
+        }
+      }
+      btn.innerHTML =
+        '<div class="opt-main"><span class="opt-letter">' + LETTERS[i] + '.</span><span class="opt-text"></span></div>' +
+        '<div class="opt-feedback"><div class="verdict">' + verdictHTML + '</div><div class="explanation"></div></div>';
+      btn.querySelector(".opt-text").textContent = opt.t;
+      btn.querySelector(".explanation").textContent = opt.e;
+      if (!answered) btn.addEventListener("click", () => { answers[current] = i; render(); });
+      box.appendChild(btn);
+    });
+
+    // רמז – מוצג רק לפני מענה
+    $("hintWrap").style.visibility = answered || !item.hint ? "hidden" : "visible";
+    $("hintText").textContent = item.hint || "";
+    $("hintText").classList.remove("open");
+    $("hintToggle").classList.remove("open");
+
+    $("prevBtn").hidden = current === 0;
+    $("nextBtn").textContent = current === QUESTIONS.length - 1 ? "סיום" : "הבא";
+  }
+
+  function showSummary() {
+    const total = QUESTIONS.length;
+    const correct = answers.filter((a, i) => a === QUESTIONS[i].correct).length;
+    $("score").textContent = correct + " / " + total;
+    $("scoreText").textContent = correct === total ? "מושלם! עניתם נכון על כל השאלות." :
+      correct >= total * 0.75 ? "כל הכבוד! תוצאה מצוינת." :
+      correct >= total / 2 ? "יפה מאוד! אפשר לנסות שוב ולשפר." : "כדאי לחזור על החומר ולנסות שוב.";
+    const list = $("summaryList");
+    list.innerHTML = "";
+    QUESTIONS.forEach((item, i) => {
+      const ok = answers[i] === item.correct;
+      const row = document.createElement("div");
+      row.className = "summary-item " + (ok ? "ok" : "no");
+      const mark = document.createElement("span");
+      mark.className = "mark";
+      mark.textContent = ok ? "✓" : (answers[i] === null ? "–" : "✗");
+      const txt = document.createElement("span");
+      txt.textContent = (i + 1) + ". " + item.q;
+      row.append(mark, txt);
+      list.appendChild(row);
+    });
+    $("quizBody").hidden = true;
+    $("summary").hidden = false;
+    window.scrollTo(0, 0);
+  }
+
+  $("hintToggle").addEventListener("click", () => {
+    $("hintToggle").classList.toggle("open");
+    $("hintText").classList.toggle("open");
+  });
+  $("prevBtn").addEventListener("click", () => { if (current > 0) { current--; render(); window.scrollTo(0, 0); } });
+  $("nextBtn").addEventListener("click", () => {
+    if (current < QUESTIONS.length - 1) { current++; render(); window.scrollTo(0, 0); }
+    else showSummary();
+  });
+  $("restartBtn").addEventListener("click", () => {
+    answers = new Array(QUESTIONS.length).fill(null);
+    current = 0;
+    $("summary").hidden = true;
+    $("quizBody").hidden = false;
+    render();
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
