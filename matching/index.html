@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>משחק התאמת מושגי AI</title>
+<style>
+:root {
+  --background: 240 30% 97%;
+  --foreground: 240 15% 12%;
+  --card: 0 0% 100%;
+  --border: 240 15% 85%;
+  --primary: 262 80% 50%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 262 40% 94%;
+  --muted: 240 20% 93%;
+  --muted-foreground: 240 10% 45%;
+  --accent: 199 89% 48%;
+  --accent-foreground: 199 90% 28%;
+  --destructive: 0 72% 51%;
+  --success: 152 60% 40%;
+  --font: 'Segoe UI', 'Arial Hebrew', Arial, sans-serif;
+  --mono: ui-monospace, 'SFMono-Regular', Consolas, monospace;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: var(--font);
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  min-height: 100dvh;
+  direction: rtl;
+}
+button { font-family: inherit; }
+.page { padding: 1rem; }
+@media (min-width: 768px) { .page { padding: 2rem; } }
+.container { max-width: 72rem; margin: 0 auto; display: flex; flex-direction: column; gap: 2rem; }
+
+/* כותרת */
+.header { display: flex; flex-direction: column; gap: 1rem; justify-content: space-between; background: hsl(var(--card)); padding: 1.5rem; border-radius: 1rem; border: 1px solid hsl(var(--border)); box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+@media (min-width: 768px) { .header { flex-direction: row; align-items: center; } }
+.header h1 { font-size: 1.5rem; font-weight: 700; color: hsl(var(--primary)); margin-bottom: 0.5rem; }
+@media (min-width: 768px) { .header h1 { font-size: 1.875rem; } }
+.header p { color: hsl(var(--muted-foreground)); }
+.timer-box { display: inline-flex; align-items: center; gap: 0.75rem; background: hsl(var(--secondary)); padding: 0.5rem 1rem; border-radius: 0.75rem; align-self: flex-start; }
+@media (min-width: 768px) { .timer-box { align-self: center; } }
+.timer-box svg { width: 20px; height: 20px; color: hsl(var(--primary)); }
+.timer { font-family: var(--mono); font-size: 1.5rem; font-weight: 700; color: hsl(var(--primary)); min-width: 80px; text-align: left; direction: ltr; }
+
+/* התקדמות */
+.progress-wrap { display: flex; flex-direction: column; gap: 0.5rem; }
+.progress-text { display: flex; justify-content: space-between; font-size: 0.875rem; font-weight: 500; color: hsl(var(--muted-foreground)); }
+.progress-bar { height: 12px; background: hsl(var(--secondary)); border-radius: 999px; overflow: hidden; }
+.progress-fill { height: 100%; width: 0; background: hsl(var(--primary)); border-radius: 999px; transition: width 0.4s ease; }
+
+/* עמודות */
+.columns { display: grid; grid-template-columns: 1fr; gap: 2rem; }
+@media (min-width: 768px) { .columns { grid-template-columns: 1fr 1fr; } }
+.column h2 { font-size: 1.25rem; font-weight: 700; color: hsl(var(--foreground) / 0.8); margin-bottom: 1rem; padding: 0 0.5rem; }
+.list { display: flex; flex-direction: column; gap: 0.75rem; }
+
+.item-wrap { opacity: 0; animation: slideIn 0.3s ease forwards; }
+.item-wrap.from-right { --from: 20px; }
+.item-wrap.from-left { --from: -20px; }
+@keyframes slideIn { from { opacity: 0; transform: translateX(var(--from)); } to { opacity: 1; transform: translateX(0); } }
+.item-wrap.shake { animation: shake 0.4s ease; opacity: 1; }
+@keyframes shake { 0%,100% { transform: translateX(0); } 20% { transform: translateX(-10px); } 40% { transform: translateX(10px); } 60% { transform: translateX(-10px); } 80% { transform: translateX(10px); } }
+
+.item { width: 100%; padding: 1.25rem; border-radius: 0.75rem; border: 2px solid; cursor: pointer; transition: all 0.2s ease; }
+.item p { line-height: 1.6; }
+.item.def { text-align: right; font-size: 1rem; background: hsl(var(--card)); border-color: hsl(var(--border)); color: hsl(var(--foreground)); }
+.item.def:hover:not(:disabled) { border-color: hsl(var(--primary) / 0.5); background: hsl(var(--secondary) / 0.4); transform: translateY(-1px); }
+.item.def.selected { background: hsl(var(--primary) / 0.1); border-color: hsl(var(--primary)); box-shadow: 0 4px 12px rgba(0,0,0,0.08); transform: scale(1.02); }
+.item.term { text-align: center; font-size: 1.125rem; font-weight: 500; background: hsl(var(--accent) / 0.05); border-color: hsl(var(--accent) / 0.25); color: hsl(var(--foreground)); }
+.item.term:hover:not(:disabled) { border-color: hsl(var(--accent) / 0.5); background: hsl(var(--accent) / 0.1); transform: translateY(-1px); }
+.item.term.selected { background: hsl(var(--accent) / 0.15); border-color: hsl(var(--accent)); color: hsl(var(--accent-foreground)); box-shadow: 0 4px 12px rgba(0,0,0,0.08); transform: scale(1.02); }
+.item.wrong { background: hsl(var(--destructive) / 0.1) !important; border-color: hsl(var(--destructive)) !important; color: hsl(var(--destructive)) !important; transform: none !important; }
+.item.matched { background: hsl(var(--muted) / 0.5) !important; border-color: hsl(var(--muted)) !important; color: hsl(var(--muted-foreground)) !important; opacity: 0.5; cursor: not-allowed; transform: scale(0.98) !important; box-shadow: none !important; }
+
+/* הודעת הצלחה */
+.toast-area { position: fixed; top: 1rem; left: 50%; transform: translateX(-50%); z-index: 200; display: flex; flex-direction: column; gap: 0.5rem; align-items: center; pointer-events: none; }
+.toast { background: hsl(152 60% 96%); color: hsl(var(--success)); border: 1px solid hsl(152 50% 80%); padding: 0.75rem 1.5rem; border-radius: 0.75rem; font-weight: 600; box-shadow: 0 6px 20px rgba(0,0,0,0.1); display: flex; align-items: center; gap: 0.5rem; animation: toastIn 0.25s ease; transition: opacity 0.3s, transform 0.3s; }
+.toast.out { opacity: 0; transform: translateY(-10px); }
+@keyframes toastIn { from { opacity: 0; transform: translateY(-12px); } to { opacity: 1; transform: translateY(0); } }
+
+/* מסך סיום */
+.end-screen { min-height: 100dvh; display: flex; align-items: center; justify-content: center; padding: 1rem; }
+.end-screen[hidden], .game-screen[hidden] { display: none; }
+.end-card { max-width: 28rem; width: 100%; background: hsl(var(--card)); border: 1px solid hsl(var(--primary) / 0.2); border-radius: 1rem; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.12); animation: popIn 0.4s ease; }
+@keyframes popIn { from { opacity: 0; transform: scale(0.8); } to { opacity: 1; transform: scale(1); } }
+.end-top { background: hsl(var(--primary) / 0.1); padding: 2rem; text-align: center; border-bottom: 1px solid hsl(var(--primary) / 0.1); }
+.end-top svg { width: 80px; height: 80px; color: hsl(var(--primary)); margin-bottom: 1rem; }
+.end-top h1 { font-size: 1.875rem; font-weight: 700; color: hsl(var(--primary)); margin-bottom: 0.5rem; }
+.end-top p { color: hsl(var(--muted-foreground)); font-size: 1.125rem; }
+.end-body { padding: 2rem; }
+.stars { display: flex; justify-content: center; gap: 0.5rem; margin-bottom: 2rem; }
+.star { width: 48px; height: 48px; opacity: 0; animation: starUp 0.4s ease forwards; }
+.star.on { fill: #facc15; color: #facc15; }
+.star.off { fill: none; color: hsl(var(--muted-foreground) / 0.3); }
+@keyframes starUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+.end-time { text-align: center; margin-bottom: 2rem; }
+.end-time .label { font-size: 0.875rem; color: hsl(var(--muted-foreground)); margin-bottom: 0.25rem; }
+.end-time .value { font-family: var(--mono); font-size: 2.25rem; font-weight: 700; direction: ltr; }
+.play-again { width: 100%; height: 3.5rem; font-size: 1.125rem; font-weight: 500; background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); border: none; border-radius: 0.5rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.5rem; transition: filter 0.15s, transform 0.15s; }
+.play-again:hover { filter: brightness(1.1); transform: translateY(-1px); }
+.play-again svg { width: 20px; height: 20px; }
+</style>
+</head>
+<body>
+
+<div class="game-screen page" id="gameScreen">
+  <div class="container">
+    <div class="header">
+      <div>
+        <h1>משחק התאמת מושגי AI</h1>
+        <p>התאם בין המושג להגדרה הנכונה שלו</p>
+      </div>
+      <div class="timer-box">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="10" x2="14" y1="2" y2="2"/><line x1="12" x2="15" y1="14" y2="11"/><circle cx="12" cy="14" r="8"/></svg>
+        <span class="timer" id="timer">00:00</span>
+      </div>
+    </div>
+
+    <div class="progress-wrap">
+      <div class="progress-text">
+        <span id="progressCount">0 / 0 זוגות הותאמו</span>
+        <span id="progressPct">0%</span>
+      </div>
+      <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+    </div>
+
+    <div class="columns">
+      <div class="column">
+        <h2>הגדרות</h2>
+        <div class="list" id="defList"></div>
+      </div>
+      <div class="column">
+        <h2>מושגים</h2>
+        <div class="list" id="termList"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="end-screen" id="endScreen" hidden>
+  <div class="end-card">
+    <div class="end-top">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
+      <h1>כל הכבוד!</h1>
+      <p>סיימת את כל ההתאמות בהצלחה</p>
+    </div>
+    <div class="end-body">
+      <div class="stars" id="stars"></div>
+      <div class="end-time">
+        <p class="label">הזמן שלך</p>
+        <p class="value" id="finalTime">00:00</p>
+      </div>
+      <button class="play-again" id="playAgain">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+        שחק שוב
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-area" id="toastArea"></div>
+
+<script>
+(function () {
+  // ===== נתוני המשחק – כאן עורכים מושגים והגדרות =====
+  const CONCEPT_PAIRS = [
+    { id: 1,  term: "פרומפט (Prompt)", definition: "ההוראה או הבקשה המדויקת שאנחנו נותנים למודל ה-AI כדי לקבל תוצאה" },
+    { id: 2,  term: "טוקן (Token)", definition: "יחידת הטקסט הבסיסית שהמודל מעבד (חשוב לזכור: זו אינה יחידת חשיבה)" },
+    { id: 3,  term: "נוסחת הזהב (Golden Formula)", definition: "המבנה המנצח לבניית פרומפט שכולל: מה + מי + איך + איפה + סגנון" },
+    { id: 4,  term: "הזיית AI (Hallucination)", definition: "מצב שבו המודל ממציא עובדות שגויות בביטחון מלא כי הוא מנחש את המילה הבאה" },
+    { id: 5,  term: "אנונימיזציה (Anonymization)", definition: "טכניקה של החלפת פרטים אישיים (שמות, כתובות) בתיאורים כלליים לשמירה על פרטיות" },
+    { id: 6,  term: "חשיבה לאחור (Backward Thinking)", definition: "הגדרת התוצאה הסופית הרצויה וקהל היעד לפני שמתחילים לכתוב את הפרומפט" },
+    { id: 7,  term: "ארנק הקרדיטים", definition: "מטאפורה לחיסכון במשאבי מחשב (ואנרגיה) דרך תכנון מדויק בדף התכנון" },
+    { id: 8,  term: "רופא הפרומפטים (Prompt Doctor)", definition: "שיטה לאבחון פרומפטים חולים (כלליים מדי) וריפוי שלהם בעזרת דיוק" },
+    { id: 9,  term: "סוכן AI (AI Agent)", definition: "מערכת AI שמסוגלת לבצע רצף של פעולות באופן עצמאי כדי להשלים מטרה מורכבת" },
+    { id: 10, term: "חוות שרתים (Data Center)", definition: "מתקני הענק הפיזיים המכילים אלפי שרתים שבהם מתבצעים חישובי ה-AI" },
+    { id: 11, term: "דיפ-פייק (Deepfake)", definition: "טכנולוגיה ליצירת תוכן מזויף (תמונה או וידאו) שנראה מציאותי לחלוטין" },
+    { id: 12, term: "שיפור איטרטיבי (Iteration)", definition: "תהליך של תיקון, ליטוש ודיוק התוצאה שוב ושוב עד להגעה לתוצר המושלם" },
+    { id: 13, term: "טביעת רגל מימית (Water Footprint)", definition: "כמות המים העצומה הנדרשת לקירור שרתי ה-AI בזמן שהם פועלים" }
+  ];
+  const SUCCESS_MESSAGES = ["כל הכבוד!", "מעולה!", "נכון!", "פנטסטי!", "מדהים!"];
+  // כוכבים: עד 2 דקות = 3, עד 4 דקות = 2, יותר = 1
+  const STAR_LIMITS = [120, 240];
+
+  const $ = (id) => document.getElementById(id);
+  const STAR_SVG = '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>';
+
+  let s; // מצב המשחק
+  let timerInterval = null;
+
+  function shuffle(arr) {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
+  function formatTime(ms) {
+    const t = Math.floor(ms / 1000);
+    return String(Math.floor(t / 60)).padStart(2, "0") + ":" + String(t % 60).padStart(2, "0");
+  }
+
+  function initGame() {
+    stopTimer();
+    s = {
+      terms: shuffle(CONCEPT_PAIRS),
+      defs: shuffle(CONCEPT_PAIRS),
+      matched: new Set(),
+      selTerm: null,
+      selDef: null,
+      wrong: null,
+      timeMs: 0,
+      running: false,
+      over: false
+    };
+    $("endScreen").hidden = true;
+    $("gameScreen").hidden = false;
+    buildLists();
+    render();
+  }
+
+  function buildLists() {
+    const defList = $("defList"), termList = $("termList");
+    defList.innerHTML = "";
+    termList.innerHTML = "";
+    s.defs.forEach((d, i) => defList.appendChild(makeItem("def", d.id, d.definition, i)));
+    s.terms.forEach((t, i) => termList.appendChild(makeItem("term", t.id, t.term, i)));
+  }
+
+  function makeItem(type, id, text, index) {
+    const wrap = document.createElement("div");
+    wrap.className = "item-wrap " + (type === "def" ? "from-right" : "from-left");
+    wrap.style.animationDelay = (index * 0.05) + "s";
+    wrap.dataset.type = type;
+    wrap.dataset.id = id;
+    const btn = document.createElement("button");
+    btn.className = "item " + type;
+    const p = document.createElement("p");
+    p.textContent = text;
+    btn.appendChild(p);
+    btn.addEventListener("click", () => handleSelect(type, id));
+    wrap.appendChild(btn);
+    return wrap;
+  }
+
+  function startTimer() {
+    s.running = true;
+    timerInterval = setInterval(() => {
+      s.timeMs += 1000;
+      $("timer").textContent = formatTime(s.timeMs);
+    }, 1000);
+  }
+  function stopTimer() {
+    if (timerInterval) clearInterval(timerInterval);
+    timerInterval = null;
+    if (s) s.running = false;
+  }
+
+  function handleSelect(type, id) {
+    if (s.matched.has(id) || s.over || s.wrong) return;
+    if (!s.running) startTimer();
+    if (type === "term") {
+      if (s.selTerm === id) { s.selTerm = null; render(); return; }
+      s.selTerm = id;
+    } else {
+      if (s.selDef === id) { s.selDef = null; render(); return; }
+      s.selDef = id;
+    }
+    render();
+    checkMatch();
+  }
+
+  function checkMatch() {
+    const t = s.selTerm, d = s.selDef;
+    if (t === null || d === null) return;
+    if (t === d) {
+      s.matched.add(t);
+      s.selTerm = null;
+      s.selDef = null;
+      showToast(SUCCESS_MESSAGES[Math.floor(Math.random() * SUCCESS_MESSAGES.length)]);
+      render();
+      if (s.matched.size === CONCEPT_PAIRS.length) {
+        stopTimer();
+        s.over = true;
+        setTimeout(showEnd, 500);
+      }
+    } else {
+      s.wrong = { termId: t, defId: d };
+      render();
+      shakeItem("term", t);
+      shakeItem("def", d);
+      setTimeout(() => {
+        s.wrong = null;
+        s.selTerm = null;
+        s.selDef = null;
+        render();
+      }, 600);
+    }
+  }
+
+  function shakeItem(type, id) {
+    const wrap = document.querySelector('.item-wrap[data-type="' + type + '"][data-id="' + id + '"]');
+    if (!wrap) return;
+    wrap.style.animationDelay = "0s";
+    wrap.classList.remove("shake");
+    void wrap.offsetWidth;
+    wrap.classList.add("shake");
+    setTimeout(() => wrap.classList.remove("shake"), 450);
+  }
+
+  function render() {
+    document.querySelectorAll(".item-wrap").forEach((wrap) => {
+      const type = wrap.dataset.type, id = Number(wrap.dataset.id);
+      const btn = wrap.firstChild;
+      const isMatched = s.matched.has(id);
+      const isSelected = type === "term" ? s.selTerm === id : s.selDef === id;
+      const isWrong = s.wrong && (type === "term" ? s.wrong.termId === id : s.wrong.defId === id);
+      btn.disabled = isMatched;
+      btn.classList.toggle("matched", isMatched);
+      btn.classList.toggle("wrong", !isMatched && !!isWrong);
+      btn.classList.toggle("selected", !isMatched && !isWrong && isSelected);
+    });
+    const total = CONCEPT_PAIRS.length, n = s.matched.size;
+    const pct = (n / total) * 100;
+    $("progressCount").textContent = n + " / " + total + " זוגות הותאמו";
+    $("progressPct").textContent = Math.round(pct) + "%";
+    $("progressFill").style.width = pct + "%";
+    $("timer").textContent = formatTime(s.timeMs);
+  }
+
+  function getStars() {
+    const sec = s.timeMs / 1000;
+    if (sec <= STAR_LIMITS[0]) return 3;
+    if (sec <= STAR_LIMITS[1]) return 2;
+    return 1;
+  }
+
+  function showEnd() {
+    const stars = getStars();
+    const box = $("stars");
+    box.innerHTML = "";
+    for (let i = 1; i <= 3; i++) {
+      const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      svg.setAttribute("viewBox", "0 0 24 24");
+      svg.setAttribute("stroke", "currentColor");
+      svg.setAttribute("stroke-width", "2");
+      svg.setAttribute("stroke-linejoin", "round");
+      svg.setAttribute("class", "star " + (i <= stars ? "on" : "off"));
+      svg.style.animationDelay = (i * 0.2) + "s";
+      svg.innerHTML = STAR_SVG;
+      box.appendChild(svg);
+    }
+    $("finalTime").textContent = formatTime(s.timeMs);
+    $("toastArea").innerHTML = "";
+    $("gameScreen").hidden = true;
+    $("endScreen").hidden = false;
+    window.scrollTo(0, 0);
+  }
+
+  function showToast(msg) {
+    const area = $("toastArea");
+    area.innerHTML = ""; // מציגים רק את ההודעה האחרונה
+    const el = document.createElement("div");
+    el.className = "toast";
+    el.textContent = "✓ " + msg;
+    area.appendChild(el);
+    setTimeout(() => {
+      el.classList.add("out");
+      setTimeout(() => el.remove(), 300);
+    }, 1300);
+  }
+
+  $("playAgain").addEventListener("click", initGame);
+  initGame();
+})();
+</script>
+</body>
+</html>

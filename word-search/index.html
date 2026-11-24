@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>תפזורת בינה מלאכותית</title>
+<style>
+:root {
+  --background: 240 30% 97%;
+  --foreground: 240 15% 12%;
+  --border: 240 15% 85%;
+  --card: 0 0% 100%;
+  --primary: 262 80% 55%;
+  --primary-foreground: 0 0% 100%;
+  --muted: 240 20% 93%;
+  --muted-foreground: 240 10% 45%;
+  --app-font-sans: 'Segoe UI', 'Arial Hebrew', Arial, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: var(--app-font-sans);
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  min-height: 100vh;
+  direction: rtl;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.game-root { max-width: 900px; margin: 0 auto; padding: 1.25rem 1rem 3rem; direction: rtl; }
+.game-header { text-align: center; margin-bottom: 1.25rem; }
+.game-title { font-size: 1.75rem; font-weight: 800; color: hsl(262 80% 40%); letter-spacing: -0.01em; margin-bottom: 0.25rem; }
+.game-subtitle { font-size: 0.9rem; color: hsl(var(--muted-foreground)); }
+.controls-bar { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; margin-bottom: 1rem; flex-wrap: wrap; }
+.mode-toggle { display: flex; align-items: center; gap: 0.5rem; background: hsl(var(--card)); border: 1px solid hsl(var(--border)); border-radius: 999px; padding: 0.25rem 0.5rem; }
+.mode-label { font-size: 0.8rem; color: hsl(var(--muted-foreground)); padding: 0 0.25rem; }
+.mode-btn { font-family: inherit; font-size: 0.8rem; font-weight: 600; padding: 0.3rem 0.75rem; border-radius: 999px; border: none; background: transparent; color: hsl(var(--muted-foreground)); cursor: pointer; transition: background 0.2s, color 0.2s; }
+.mode-btn.active { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); }
+.reset-btn { font-family: inherit; font-size: 0.85rem; font-weight: 600; padding: 0.45rem 1rem; border-radius: 999px; border: 1.5px solid hsl(var(--border)); background: hsl(var(--card)); color: hsl(var(--foreground)); cursor: pointer; transition: background 0.15s, border-color 0.15s; }
+.reset-btn:hover { background: hsl(var(--muted)); }
+.reset-btn.large { font-size: 1rem; padding: 0.6rem 1.5rem; margin-top: 1rem; }
+.stats-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 1rem; }
+.stat-card { background: hsl(var(--card)); border: 1px solid hsl(var(--border)); border-radius: 0.75rem; padding: 0.85rem 1.1rem; text-align: center; }
+.stat-label { font-size: 0.78rem; color: hsl(var(--muted-foreground)); margin-bottom: 0.25rem; }
+.stat-value { font-size: 1.5rem; font-weight: 800; color: hsl(262 80% 45%); }
+.progress-bar-wrap { margin-top: 0.5rem; height: 6px; background: hsl(var(--muted)); border-radius: 999px; overflow: hidden; }
+.progress-bar-fill { height: 100%; width: 0; background: linear-gradient(90deg, hsl(262 80% 55%), hsl(230 80% 60%)); border-radius: 999px; transition: width 0.4s ease; }
+.word-bank, .hints-section { background: hsl(var(--card)); border: 1px solid hsl(var(--border)); border-radius: 0.875rem; padding: 0.9rem 1rem; margin-bottom: 1rem; }
+.word-bank-title, .hints-title { font-size: 0.82rem; font-weight: 700; color: hsl(var(--muted-foreground)); margin-bottom: 0.6rem; text-align: left; }
+.word-bank-list { display: flex; flex-wrap: wrap; gap: 0.45rem; justify-content: flex-end; }
+.word-chip { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.9rem; font-weight: 600; padding: 0.3rem 0.75rem; border-radius: 999px; border: 1.5px solid hsl(var(--border)); background: hsl(var(--muted)); color: hsl(var(--foreground)); cursor: default; transition: all 0.25s ease; position: relative; }
+.word-chip.found { text-decoration: line-through; opacity: 0.75; }
+.word-chip.flash { transform: scale(1.12); box-shadow: 0 0 0 3px currentColor; }
+.checkmark { font-weight: 900; font-size: 0.8rem; }
+.grid-container { display: flex; justify-content: center; margin-bottom: 1rem; }
+.grid { display: grid; gap: 3px; width: max-content; touch-action: none; background: hsl(var(--card)); border: 1.5px solid hsl(var(--border)); border-radius: 0.875rem; padding: 0.6rem; max-width: 100%; }
+.grid.shake { animation: shake 0.4s ease; }
+@keyframes shake { 0%,100% { transform: translateX(0); } 20% { transform: translateX(-5px); } 40% { transform: translateX(5px); } 60% { transform: translateX(-5px); } 80% { transform: translateX(5px); } }
+.cell { --cs: min(48px, max(18px, calc((100vw - 2rem - 1.2rem - 3px - 42px) / 15))); width: var(--cs); height: var(--cs); display: flex; align-items: center; justify-content: center; font-size: clamp(0.7rem, 3.4vw, 1rem); font-weight: 600; border-radius: 6px; border: 1.5px solid transparent; background: hsl(var(--muted)); color: hsl(var(--foreground)); cursor: pointer; transition: background 0.12s, color 0.12s, border-color 0.12s, transform 0.08s; user-select: none; -webkit-user-select: none; }
+.cell:hover { background: hsl(262 70% 92%); }
+.cell.selected { background: hsl(262 70% 75%) !important; color: white !important; border-color: hsl(262 80% 55%) !important; transform: scale(1.05); z-index: 1; }
+.hints-list { display: flex; flex-direction: column; gap: 0.35rem; }
+.hint-item { display: flex; align-items: center; gap: 0.5rem; font-size: 0.88rem; color: hsl(var(--foreground)); padding: 0.2rem 0; }
+.hint-item.hint-found { opacity: 0.55; text-decoration: line-through; }
+.hint-dot { width: 10px; height: 10px; border-radius: 50%; background: hsl(var(--muted-foreground)); flex-shrink: 0; transition: background 0.2s; }
+.hint-text { line-height: 1.3; }
+.completion-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.55); display: flex; align-items: center; justify-content: center; z-index: 100; animation: fadeIn 0.3s ease; }
+.completion-overlay[hidden] { display: none; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+.completion-card { background: hsl(var(--card)); border-radius: 1.25rem; padding: 2.5rem 2rem; text-align: center; max-width: 320px; width: 90%; box-shadow: 0 20px 60px rgba(0,0,0,0.25); animation: popIn 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+@keyframes popIn { from { transform: scale(0.7); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.completion-emoji { font-size: 3.5rem; margin-bottom: 0.5rem; }
+.completion-card h2 { font-size: 1.75rem; font-weight: 800; color: hsl(262 80% 45%); margin-bottom: 0.5rem; }
+.completion-card p { font-size: 1rem; color: hsl(var(--muted-foreground)); }
+@media (max-width: 480px) {
+  .game-root { padding-left: 0.5rem; padding-right: 0.5rem; }
+  .grid { gap: 2px; padding: 0.4rem; }
+  .cell { --cs: calc((100vw - 1rem - 0.8rem - 3px - 28px) / 15); border-radius: 4px; }
+  .game-title { font-size: 1.35rem; }
+  .controls-bar { flex-direction: column; align-items: stretch; }
+  .mode-toggle { justify-content: center; }
+  .reset-btn { text-align: center; }
+}
+</style>
+</head>
+<body>
+<div class="game-root">
+  <header class="game-header">
+    <h1 class="game-title">🤖 תפזורת בינה מלאכותית</h1>
+    <p class="game-subtitle">מצאו את המילים הקשורות לעולם ה-AI</p>
+  </header>
+
+  <div class="controls-bar">
+    <div class="mode-toggle">
+      <span class="mode-label">מצב:</span>
+      <button class="mode-btn active" id="modeBank">עם מחסן מילים</button>
+      <button class="mode-btn" id="modeHints">ללא מחסן מילים</button>
+    </div>
+    <button class="reset-btn" id="resetBtn">🔄 התחל מחדש</button>
+  </div>
+
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="stat-label">התקדמות</div>
+      <div class="stat-value" id="progressText">0%</div>
+      <div class="progress-bar-wrap"><div class="progress-bar-fill" id="progressFill"></div></div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">מילים שנמצאו</div>
+      <div class="stat-value" id="countText">0/0</div>
+    </div>
+  </div>
+
+  <div class="word-bank" id="wordBank">
+    <div class="word-bank-title">📋 מילים לחפש:</div>
+    <div class="word-bank-list" id="wordBankList"></div>
+  </div>
+
+  <div class="grid-container">
+    <div class="grid" id="grid"></div>
+  </div>
+
+  <div class="hints-section" id="hintsSection" hidden>
+    <div class="hints-title">💡 רמזים:</div>
+    <div class="hints-list" id="hintsList"></div>
+  </div>
+</div>
+
+<div class="completion-overlay" id="completion" hidden>
+  <div class="completion-card">
+    <div class="completion-emoji">🎉</div>
+    <h2>כל הכבוד!</h2>
+    <p id="completionText"></p>
+    <button class="reset-btn large" id="playAgainBtn">🔄 שחק שוב</button>
+  </div>
+</div>
+
+<script>
+(function () {
+  // ===== נתוני המשחק – כאן עורכים מילים ורמזים =====
+  const WORDS_DATA = [
+    { word: "פרומפט", hint: "השאלה שנותנים לבינה" },
+    { word: "איטרטיבי", hint: "חזרה שוב ושוב עד שעובד" },
+    { word: "נתונים", hint: "מידע שהבינה לומדת ממנו" },
+    { word: "למידה", hint: "התהליך שבו הבינה מתחכמת" },
+    { word: "שגיאה", hint: "טעות שהבינה עושה" },
+    { word: "שיפור", hint: "תיקון של התוצאות" },
+    { word: "זיהוי", hint: "היכולת לזהות דברים" },
+    { word: "תמונה", hint: "ציור או תצלום" },
+    { word: "טקסט", hint: "מילים וכתיבה" },
+    { word: "קלט", hint: "מה שנשלח לבינה" },
+    { word: "תשובה", hint: "מה שהבינה נותנת חזרה" },
+    { word: "בדיקה", hint: "בדיקה אם הכל עובד" },
+    { word: "הוראה", hint: "פקודה לבינה" },
+    { word: "רובוט", hint: "מכונה חכמה" }
+  ];
+  const WORD_COLORS = ["#e74c8b","#3b82f6","#10b981","#f59e0b","#8b5cf6","#ec4899","#06b6d4","#84cc16","#f97316","#6366f1","#14b8a6","#d946ef","#0ea5e9","#22c55e"];
+  const GRID_SIZE = 15;
+  const HEBREW_LETTERS = "אבגדהוזחטיכלמנסעפצקרשת";
+  const DIRECTIONS = [[0,1],[0,-1],[1,0],[-1,0],[1,1],[1,-1],[-1,1],[-1,-1]];
+
+  const wordColor = new Map();
+  WORDS_DATA.forEach((w, i) => wordColor.set(w.word, WORD_COLORS[i % WORD_COLORS.length]));
+
+  // ===== לוגיקת יצירת הלוח =====
+  function tryGenerateGrid(words, size) {
+    const grid = Array.from({ length: size }, () => Array(size).fill(""));
+    const placements = new Map();
+    const sorted = [...words].sort((a, b) => b.length - a.length);
+    for (const word of sorted) {
+      let placed = false, attempts = 0;
+      while (!placed && attempts < 500) {
+        attempts++;
+        const dir = DIRECTIONS[Math.floor(Math.random() * DIRECTIONS.length)];
+        const row = Math.floor(Math.random() * size);
+        const col = Math.floor(Math.random() * size);
+        const cells = [];
+        let ok = true;
+        for (let i = 0; i < word.length; i++) {
+          const r = row + dir[0] * i, c = col + dir[1] * i;
+          if (r < 0 || r >= size || c < 0 || c >= size) { ok = false; break; }
+          const ex = grid[r][c];
+          if (ex !== "" && ex !== word[i]) { ok = false; break; }
+          cells.push([r, c]);
+        }
+        if (ok) {
+          cells.forEach(([r, c], i) => { grid[r][c] = word[i]; });
+          placements.set(word, { cells });
+          placed = true;
+        }
+      }
+      if (!placed) return null; // מילה לא נכנסה – ננסה לוח חדש
+    }
+    for (let r = 0; r < size; r++)
+      for (let c = 0; c < size; c++)
+        if (grid[r][c] === "") grid[r][c] = HEBREW_LETTERS[Math.floor(Math.random() * HEBREW_LETTERS.length)];
+    return { grid, placements };
+  }
+
+  function generateGrid(words, size) {
+    for (let i = 0; i < 50; i++) {
+      const res = tryGenerateGrid(words, size);
+      if (res) return res;
+    }
+    throw new Error("לא ניתן לשבץ את כל המילים בלוח");
+  }
+
+  function getCellsInLine(start, end) {
+    const [r1, c1] = start, [r2, c2] = end;
+    const dr = r2 - r1, dc = c2 - c1;
+    if (dr === 0 && dc === 0) return [start];
+    if (dr !== 0 && dc !== 0 && Math.abs(dr) !== Math.abs(dc)) return [start];
+    const steps = Math.max(Math.abs(dr), Math.abs(dc));
+    const sr = Math.sign(dr), sc = Math.sign(dc);
+    const cells = [];
+    for (let i = 0; i <= steps; i++) cells.push([r1 + sr * i, c1 + sc * i]);
+    return cells;
+  }
+  const key = (r, c) => r + "," + c;
+
+  // ===== מצב =====
+  let state;
+  const $ = (id) => document.getElementById(id);
+  const gridEl = $("grid");
+  let cellEls = [];
+
+  function newGame() {
+    const { grid, placements } = generateGrid(WORDS_DATA.map(w => w.word), GRID_SIZE);
+    state = {
+      grid, placements,
+      foundWords: new Map(),
+      foundCells: new Map(),
+      dragStart: null, dragEnd: null, isDragging: false,
+      flashWord: null
+    };
+    $("completion").hidden = true;
+    buildGrid();
+    renderAll();
+  }
+
+  function buildGrid() {
+    gridEl.innerHTML = "";
+    gridEl.style.gridTemplateColumns = "repeat(" + GRID_SIZE + ", 1fr)";
+    cellEls = [];
+    state.grid.forEach((row, r) => {
+      cellEls[r] = [];
+      row.forEach((letter, c) => {
+        const d = document.createElement("div");
+        d.className = "cell";
+        d.dataset.cell = key(r, c);
+        d.textContent = letter;
+        d.addEventListener("mousedown", (e) => { e.preventDefault(); startDrag(r, c); });
+        d.addEventListener("mouseenter", () => { if (state.isDragging) { state.dragEnd = [r, c]; renderSelection(); } });
+        d.addEventListener("touchstart", (e) => { e.preventDefault(); startDrag(r, c); }, { passive: false });
+        gridEl.appendChild(d);
+        cellEls[r][c] = d;
+      });
+    });
+  }
+
+  function startDrag(r, c) {
+    state.dragStart = [r, c];
+    state.dragEnd = [r, c];
+    state.isDragging = true;
+    renderSelection();
+  }
+
+  function endDrag() {
+    if (state.isDragging && state.dragStart && state.dragEnd) {
+      checkSelection(getCellsInLine(state.dragStart, state.dragEnd));
+    }
+    state.isDragging = false;
+    state.dragStart = null;
+    state.dragEnd = null;
+    renderSelection();
+  }
+
+  function checkSelection(cells) {
+    if (cells.length < 2) return;
+    const letters = cells.map(([r, c]) => state.grid[r][c]).join("");
+    const reversed = [...letters].reverse().join("");
+    let matched = null;
+    for (const [word, p] of state.placements.entries()) {
+      if (state.foundWords.has(word)) continue;
+      const pl = p.cells.map(([r, c]) => state.grid[r][c]).join("");
+      if (pl === letters || pl === reversed) { matched = word; break; }
+    }
+    if (matched) {
+      const color = wordColor.get(matched) || "#6366f1";
+      state.foundWords.set(matched, color);
+      cells.forEach(([r, c]) => state.foundCells.set(key(r, c), { color }));
+      state.flashWord = matched;
+      setTimeout(() => { state.flashWord = null; renderWordLists(); }, 1200);
+      renderAll();
+      if (state.foundWords.size === WORDS_DATA.length) {
+        setTimeout(() => {
+          $("completionText").textContent = "מצאתם את כל " + WORDS_DATA.length + " המילים!";
+          $("completion").hidden = false;
+        }, 500);
+      }
+    } else {
+      gridEl.classList.remove("shake");
+      void gridEl.offsetWidth;
+      gridEl.classList.add("shake");
+      setTimeout(() => gridEl.classList.remove("shake"), 500);
+    }
+  }
+
+  function getCellFromPoint(x, y) {
+    const el = document.elementFromPoint(x, y);
+    if (!el || !el.dataset || !el.dataset.cell) return null;
+    return el.dataset.cell.split(",").map(Number);
+  }
+
+  // ===== תצוגה =====
+  function renderSelection() {
+    const sel = new Set();
+    if (state.dragStart) {
+      const cells = state.dragEnd ? getCellsInLine(state.dragStart, state.dragEnd) : [state.dragStart];
+      cells.forEach(([r, c]) => sel.add(key(r, c)));
+    }
+    for (let r = 0; r < GRID_SIZE; r++)
+      for (let c = 0; c < GRID_SIZE; c++)
+        cellEls[r][c].classList.toggle("selected", sel.has(key(r, c)));
+  }
+
+  function renderFoundCells() {
+    for (let r = 0; r < GRID_SIZE; r++)
+      for (let c = 0; c < GRID_SIZE; c++) {
+        const el = cellEls[r][c];
+        const f = state.foundCells.get(key(r, c));
+        if (f) {
+          el.style.backgroundColor = f.color + "33";
+          el.style.color = f.color;
+          el.style.borderColor = f.color + "66";
+          el.style.fontWeight = "700";
+        } else {
+          el.removeAttribute("style");
+        }
+      }
+  }
+
+  function renderWordLists() {
+    const bank = $("wordBankList");
+    bank.innerHTML = "";
+    WORDS_DATA.forEach(({ word, hint }) => {
+      const color = wordColor.get(word);
+      const isFound = state.foundWords.has(word);
+      const chip = document.createElement("div");
+      chip.className = "word-chip" + (isFound ? " found" : "") + (state.flashWord === word ? " flash" : "");
+      chip.title = hint;
+      if (isFound) {
+        chip.style.backgroundColor = color + "22";
+        chip.style.borderColor = color;
+        chip.style.color = color;
+        const ck = document.createElement("span");
+        ck.className = "checkmark";
+        ck.textContent = "✓";
+        chip.appendChild(ck);
+      }
+      chip.appendChild(document.createTextNode(word));
+      bank.appendChild(chip);
+    });
+
+    const hints = $("hintsList");
+    hints.innerHTML = "";
+    WORDS_DATA.forEach(({ word, hint }) => {
+      const isFound = state.foundWords.has(word);
+      const item = document.createElement("div");
+      item.className = "hint-item" + (isFound ? " hint-found" : "");
+      const dot = document.createElement("span");
+      dot.className = "hint-dot";
+      if (isFound) dot.style.background = wordColor.get(word);
+      const txt = document.createElement("span");
+      txt.className = "hint-text";
+      txt.textContent = isFound ? word : hint;
+      item.append(dot, txt);
+      hints.appendChild(item);
+    });
+  }
+
+  function renderStats() {
+    const found = state.foundWords.size, total = WORDS_DATA.length;
+    const progress = Math.round((found / total) * 100);
+    $("progressText").textContent = progress + "%";
+    $("progressFill").style.width = progress + "%";
+    $("countText").textContent = found + "/" + total;
+  }
+
+  function renderAll() {
+    renderFoundCells();
+    renderSelection();
+    renderWordLists();
+    renderStats();
+  }
+
+  function setMode(withBank) {
+    $("modeBank").classList.toggle("active", withBank);
+    $("modeHints").classList.toggle("active", !withBank);
+    $("wordBank").hidden = !withBank;
+    $("hintsSection").hidden = withBank;
+  }
+
+  // ===== אירועים =====
+  $("modeBank").addEventListener("click", () => setMode(true));
+  $("modeHints").addEventListener("click", () => setMode(false));
+  $("resetBtn").addEventListener("click", newGame);
+  $("playAgainBtn").addEventListener("click", (e) => { e.stopPropagation(); newGame(); });
+  $("completion").addEventListener("click", () => { $("completion").hidden = true; });
+
+  gridEl.addEventListener("mouseleave", () => { if (state.isDragging) endDrag(); });
+  window.addEventListener("mouseup", endDrag);
+  window.addEventListener("touchmove", (e) => {
+    if (!state.isDragging) return;
+    e.preventDefault();
+    const t = e.touches[0];
+    const cell = getCellFromPoint(t.clientX, t.clientY);
+    if (cell) { state.dragEnd = cell; renderSelection(); }
+  }, { passive: false });
+  window.addEventListener("touchend", endDrag);
+
+  newGame();
+})();
+</script>
+</body>
+</html>
